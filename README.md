@@ -3,9 +3,13 @@ Aiming to accelerate neural network inference time on embedded systems via model
 
 ## Setup
 ```bash
+# Set up Python environment
 virtualenv --python $(which python3) venv
 source venv/bin/activate
 pip install -r requirements.txt
+
+# Download dataset
+sh download_dataset.sh
 ```
 
 ## Usage
