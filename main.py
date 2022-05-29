@@ -6,6 +6,7 @@ from keras.optimizers import adam_v2
 from keras.callbacks import ModelCheckpoint, EarlyStopping
 from keras.preprocessing import image
 from keras import backend as K
+from tensorflow_model_optimization.sparsity import keras as sparsity
 import numpy as np
 import matplotlib
 from matplotlib import pyplot as plt
@@ -42,8 +43,28 @@ def f1_m(y_true, y_pred):
 # plt.savefig("graph_acc_loss.png")
 
 class MyVGG16:
+  # -- load images
+  id_generator = ImageDataGenerator(
+      featurewise_center=False,  # set input mean to 0 over the dataset
+      samplewise_center=False,  # set each sample mean to 0
+      featurewise_std_normalization=False,  # divide inputs by std of the dataset
+      samplewise_std_normalization=False,  # divide each input by its std
+      zca_whitening=False,  # apply ZCA whitening
+      rotation_range=15,  # randomly rotate images in the range (degrees, 0 to 180)
+      width_shift_range=0.1,  # randomly shift images horizontally (fraction of total width)
+      height_shift_range=0.1,  # randomly shift images vertically (fraction of total height)
+      horizontal_flip=True,  # randomly flip images
+      vertical_flip=False)  # randomly flip images
+
+  # TODO: consider using color_mode parameter to reduce to grayscale
+  train_data = id_generator.flow_from_directory(
+    directory="data/train", target_size=(224, 224))
+  test_data = id_generator.flow_from_directory(
+    directory="data/test", target_size=(224, 224))
+
   def __init__(self, train=True):
     self.num_classes = 3
+    self.learning_rate = 0.0001
     self.weight_decay = 0.0005
     self.x_shape = [32, 32, 3]
 
@@ -138,33 +159,9 @@ class MyVGG16:
     # training parameters
     batch_size = 32
     max_epochs = 10
-    learning_rate = 0.0001
-
-    # -- load images
-    id_generator = ImageDataGenerator(
-        featurewise_center=False,  # set input mean to 0 over the dataset
-        samplewise_center=False,  # set each sample mean to 0
-        featurewise_std_normalization=False,  # divide inputs by std of the dataset
-        samplewise_std_normalization=False,  # divide each input by its std
-        zca_whitening=False,  # apply ZCA whitening
-        rotation_range=15,  # randomly rotate images in the range (degrees, 0 to 180)
-        width_shift_range=0.1,  # randomly shift images horizontally (fraction of total width)
-        height_shift_range=0.1,  # randomly shift images vertically (fraction of total height)
-        horizontal_flip=True,  # randomly flip images
-        vertical_flip=False)  # randomly flip images
-
-    # TODO: consider using color_mode parameter to reduce to grayscale
-    train_data = id_generator.flow_from_directory(
-      directory="data/train", target_size=(224, 224))
-    test_data = id_generator.flow_from_directory(
-      directory="data/test", target_size=(224, 224))
-
-    # train_data = train_data.astype("float32")
-    # test_data = test_data.astype("float32")
-    # train_data, test_data = self.normalize(train_data, test_data)
 
     # -- Compile model
-    opt = adam_v2.Adam(learning_rate=learning_rate)
+    opt = adam_v2.Adam(learning_rate=self.learning_rate)
     self.model.compile(optimizer=opt, loss=keras.losses.categorical_crossentropy, metrics=['accuracy', f1_m, precision_m, recall_m])
 
     self.model.summary()
@@ -175,8 +172,8 @@ class MyVGG16:
 
     start_time = time.time()
     hist = self.model.fit(
-      train_data,
-      validation_data=test_data,
+      self.train_data,
+      validation_data=self.test_data,
       # steps_per_epoch=len(train_data) // batch_size,
       epochs=max_epochs,
       # validation_steps=10,
@@ -221,30 +218,78 @@ class MyVGG16:
 
     return prediction_ind
 
+  def prune(self):
+    if self.model == None:
+      raise Exception("No model to prune.")
+
+    epochs = 10
+    batch_size = 32
+    end_step = np.ceil(1.0 * len(self.train_data) / batch_size).astype(np.int32) * epochs
+    print("End step:", end_step)
+
+    new_pruning_params = {
+      'pruning_schedule': sparsity.PolynomialDecay(initial_sparsity=0.30,
+                                                  final_sparsity=0.70,
+                                                  begin_step=0,
+                                                  end_step=end_step,
+                                                  frequency=100)
+    }
+
+    new_pruned_model = sparsity.prune_low_magnitude(self.model, **new_pruning_params)
+
+    opt = adam_v2.Adam(learning_rate=self.learning_rate)
+    new_pruned_model.compile(optimizer=opt, loss=keras.losses.categorical_crossentropy, metrics=['accuracy', f1_m, precision_m, recall_m])
+    # new_pruned_model.summary()
+
+    # -- Model fitting
+    callbacks = [
+      sparsity.UpdatePruningStep()
+    ]
+
+    start_time = time.time()
+    hist = new_pruned_model.fit(
+      self.train_data,
+      validation_data=self.test_data,
+      # steps_per_epoch=len(train_data) // batch_size,
+      epochs=epochs,
+      # validation_steps=10,
+      # batch_size=batch_size,
+      callbacks=callbacks)
+
+    loss, acc, f1_score, precision, recall = new_pruned_model.evaluate(self.test_data)
+
+    print()
+    print("-- Evaluation of PRUNED model on testing dataset --")
+    print("Loss: {}\nAcc: {}\nF1 Score: {}\nPrecision: {}\nRecall: {}".format(
+      round(loss*100, 3),
+      round(acc*100, 3),
+      round(f1_score*100, 3),
+      round(precision*100, 3),
+      round(recall*100, 3),
+    ))
+    print()
+
+    final_model = sparsity.strip_pruning(new_pruned_model)
+    keras.models.save_model(final_model, "vgg16-pruned.h5")
+    print("Saved pruned Keras model to vgg16-pruned.h5")
+    # final_model.summary()
+
 
 def main():
-  model = MyVGG16(train=True)
+  model = MyVGG16(train=False)
 
-  id_generator = ImageDataGenerator(
-      featurewise_center=False,  # set input mean to 0 over the dataset
-      samplewise_center=False,  # set each sample mean to 0
-      featurewise_std_normalization=False,  # divide inputs by std of the dataset
-      samplewise_std_normalization=False,  # divide each input by its std
-      zca_whitening=False,  # apply ZCA whitening
-      rotation_range=15,  # randomly rotate images in the range (degrees, 0 to 180)
-      width_shift_range=0.1,  # randomly shift images horizontally (fraction of total width)
-      height_shift_range=0.1,  # randomly shift images vertically (fraction of total height)
-      horizontal_flip=True,  # randomly flip images
-      vertical_flip=False)  # randomly flip images
-  test_data = id_generator.flow_from_directory(
-  directory="data/test", target_size=(224, 224))
-  model.test(test_data)
+  # -- Evaluate model
+  model.test(model.test_data)
 
-  img = image.load_img("data/validate/rock1.png", target_size=(224,224))
-  img = np.asarray(img)
-  img = np.expand_dims(img, axis=0)
+  # -- Classify a single image
+  # img = image.load_img("data/validate/rock1.png", target_size=(224,224))
+  # img = np.asarray(img)
+  # img = np.expand_dims(img, axis=0)
 
-  model.predict(img)
+  # model.predict(img)
+
+  # -- Prune model
+  model.prune()
 
 if __name__ == "__main__":
   main()
