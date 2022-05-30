@@ -1,4 +1,4 @@
-import keras, time
+import keras, time, os
 from keras.models import Sequential, load_model
 from keras.layers import Dense, Conv2D, MaxPool2D, Flatten
 from keras.preprocessing.image import ImageDataGenerator
@@ -209,7 +209,7 @@ def prune(model, train_data, test_data, learning_rate, epochs, batch_size):
 
 
 def main():
-  should_train = True
+  should_train = False
 
   # -- load images
   id_generator = ImageDataGenerator(
@@ -271,6 +271,17 @@ def main():
   predict(model, img)
   predict(pruned_model, img)
 
+  # -- Measure pruning size difference
+  before_size = os.path.getsize("vgg16.h5")
+  after_size = os.path.getsize("vgg16-pruned.h5")
+  print("Size of model BEFORE pruning:")
+  print(round(before_size / float(2**20), 2), "MB")
+
+  print("Size of model AFTER pruning:")
+  print(round(after_size / float(2**20), 2), "MB")
+
+  print("Percentage size reduction:")
+  print(round((before_size-after_size)/after_size * 100, 2))
 
 if __name__ == "__main__":
   main()
