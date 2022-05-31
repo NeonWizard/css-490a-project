@@ -6,6 +6,7 @@ from keras.optimizers import adam_v2
 from keras.callbacks import ModelCheckpoint, EarlyStopping
 from keras.preprocessing import image
 from keras import backend as K
+import tensorflow as tf
 from tensorflow_model_optimization.sparsity import keras as sparsity
 import numpy as np
 import matplotlib
@@ -282,6 +283,20 @@ def main():
 
   print("Percentage size reduction:")
   print(round((before_size-after_size)/after_size * 100, 2))
+
+  # -- Convert and save TFLite models
+  base_tflite_model = tf.lite.TFLiteConverter.from_keras_model(model).convert()
+  pruned_tflite_model = tf.lite.TFLiteConverter.from_keras_model(stripped_model).convert()
+
+  with open("vgg16.tflite", 'wb') as f:
+    f.write(base_tflite_model)
+
+  print("Saved base TFLite model to 'vgg16.tflite'.")
+
+  with open("vgg16-pruned.tflite", 'wb') as f:
+    f.write(pruned_tflite_model)
+
+  print("Saved pruned TFLite model to 'vgg16-pruned.tflite'.")
 
 if __name__ == "__main__":
   main()

@@ -134,3 +134,4 @@ out.txt
 graphs/
 models/
 graph_*.png
+*.tflite
