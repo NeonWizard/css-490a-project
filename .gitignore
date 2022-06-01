@@ -135,3 +135,4 @@ graphs/
 models/
 graph_*.png
 *.tflite
+*.p
