@@ -173,8 +173,8 @@ def prune(model, train_data, test_data, learning_rate, epochs, batch_size):
   print("End step:", end_step)
 
   new_pruning_params = {
-    'pruning_schedule': sparsity.PolynomialDecay(initial_sparsity=0.30,
-                                                final_sparsity=0.70,
+    'pruning_schedule': sparsity.PolynomialDecay(initial_sparsity=0.50,
+                                                final_sparsity=0.90,
                                                 begin_step=0,
                                                 end_step=end_step)
                                                 # frequency=100)
@@ -281,8 +281,8 @@ def main():
   print("Size of model AFTER pruning:")
   print(round(after_size / float(2**20), 2), "MB")
 
-  print("Percentage size reduction:")
-  print(round((before_size-after_size)/after_size * 100, 2))
+  print("Size percentage of original:")
+  print("{}%".format(round(before_size/after_size * 100, 2)))
 
   # -- Convert and save TFLite models
   base_tflite_model = tf.lite.TFLiteConverter.from_keras_model(model).convert()

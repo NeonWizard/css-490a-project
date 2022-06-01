@@ -53,6 +53,7 @@ def evaluate_model(tflite_file):
 
     label = subdir.replace(test_folder+"/", "", 1)
 
+    print("Testing images of type:", label)
     with tqdm(total=len(files), ncols=64) as pbar:
       image_count = 0
       image_class_folder = test_folder + "/" + label
@@ -108,8 +109,11 @@ def analyze_bench(tflite_file):
 
 
 def main():
-  # evaluate_model(base_tflite_file)
-  # evaluate_model(pruned_tflite_file)
+  should_evaluate = True
+
+  if should_evaluate:
+    evaluate_model(base_tflite_file)
+    evaluate_model(pruned_tflite_file)
 
   analyze_bench(base_tflite_file)
   print()
