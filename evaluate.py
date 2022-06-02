@@ -9,11 +9,6 @@ import os
 import pickle
 from tqdm import tqdm
 
-base_tflite_file = "vgg16.tflite"
-pruned_tflite_file = "vgg16-pruned.tflite"
-
-tflite_file = base_tflite_file
-
 def set_input_tensor(interpreter, image):
   tensor_index = interpreter.get_input_details()[0]['index']
   input_tensor = interpreter.tensor(tensor_index)()[0]
@@ -109,15 +104,12 @@ def analyze_bench(tflite_file):
 
 
 def main():
-  should_evaluate = True
+  tflite_file = input("TFLite file: ")
 
-  if should_evaluate:
-    evaluate_model(base_tflite_file)
-    evaluate_model(pruned_tflite_file)
+  if input("Evaluate model (y/n)? ").lower() == "y":
+    evaluate_model(tflite_file)
 
-  analyze_bench(base_tflite_file)
-  print()
-  analyze_bench(pruned_tflite_file)
+  analyze_bench(tflite_file)
 
 if __name__ == "__main__":
   main()
