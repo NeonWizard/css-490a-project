@@ -173,8 +173,8 @@ def prune(model, train_data, test_data, learning_rate, epochs, batch_size):
   print("End step:", end_step)
 
   new_pruning_params = {
-    'pruning_schedule': sparsity.PolynomialDecay(initial_sparsity=0.50,
-                                                final_sparsity=0.90,
+    'pruning_schedule': sparsity.PolynomialDecay(initial_sparsity=0.30,
+                                                final_sparsity=0.80,
                                                 begin_step=0,
                                                 end_step=end_step)
                                                 # frequency=100)
@@ -250,8 +250,8 @@ def main():
     train_data,
     test_data,
     learning_rate,
-    epochs=10,
-    batch_size=32)
+    epochs=3,
+    batch_size=16)
 
   # -- Evaluate model
   print()
